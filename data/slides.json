@@ -1,0 +1,15 @@
+{
+  "slides": [
+    {
+      "id": "demo-1",
+      "title": "Google Apps Script Dashboard",
+      "url": "https://script.google.com/home/projects/1k-mjyXPkB27qJ1ydjftwJbM__ET3G7W2YOeBPIaIbDDbGdrqxEuCgzt8/edit",
+      "duration": 30,
+      "enabled": true,
+      "order": 0,
+      "createdAt": "2024-01-01T00:00:00.000Z"
+    }
+  ],
+  "adminPassword": "admin123",
+  "lastUpdated": "2024-01-01T00:00:00.000Z"
+}
