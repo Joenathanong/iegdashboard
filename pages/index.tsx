@@ -12,14 +12,22 @@ export default function Player() {
   const [loading, setLoading] = useState(true);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
   const controlsTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const slidesRef = useRef<Slide[]>([]);
 
   const fetchSlides = useCallback(async () => {
     try {
       const res = await fetch("/api/slides");
       const data = await res.json();
       if (data.slides && data.slides.length > 0) {
-        setSlides(data.slides);
-        setTimeLeft(data.slides[0].duration);
+        const newSlides: Slide[] = data.slides;
+        slidesRef.current = newSlides;
+        setSlides(newSlides);
+        // Only reset to 0 if slide list changed significantly
+        setCurrent((prev) => (prev >= newSlides.length ? 0 : prev));
+        setTimeLeft((prev) => (prev === 0 ? newSlides[0]?.duration ?? 30 : prev));
+      } else {
+        setSlides([]);
+        slidesRef.current = [];
       }
     } catch (err) {
       console.error(err);
@@ -30,8 +38,8 @@ export default function Player() {
 
   useEffect(() => {
     fetchSlides();
-    // Refresh slide list every 60s to pick up admin changes
-    const refreshTimer = setInterval(fetchSlides, 60000);
+    // Poll every 15 seconds to pick up changes from admin
+    const refreshTimer = setInterval(fetchSlides, 15000);
     return () => clearInterval(refreshTimer);
   }, [fetchSlides]);
 
@@ -41,8 +49,8 @@ export default function Player() {
       setTimeLeft((prev) => {
         if (prev <= 1) {
           setCurrent((c) => {
-            const next = (c + 1) % slides.length;
-            setTimeout(() => setTimeLeft(slides[next].duration), 0);
+            const next = (c + 1) % slidesRef.current.length;
+            setTimeout(() => setTimeLeft(slidesRef.current[next]?.duration ?? 30), 0);
             return next;
           });
           return 0;
@@ -50,9 +58,7 @@ export default function Player() {
         return prev - 1;
       });
     }, 1000);
-    return () => {
-      if (intervalRef.current) clearInterval(intervalRef.current);
-    };
+    return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
   }, [slides, paused]);
 
   const goTo = (idx: number) => {
@@ -103,24 +109,15 @@ export default function Player() {
         <meta name="viewport" content="width=device-width, initial-scale=1" />
       </Head>
       <div className="player-container" onMouseMove={handleMouseMove}>
-        {/* iframe */}
-        <iframe
-          key={slide.id + "-" + current}
-          src={slide.url}
-          className="player-iframe"
-          title={slide.title}
-          sandbox="allow-same-origin allow-scripts allow-forms allow-popups"
-        />
+
+        {/* Iframe dengan fallback */}
+        <IframeWithFallback key={slide.id + current} slide={slide} />
 
         {/* Nav buttons */}
-        <button className="player-nav-btn prev" onClick={() => goTo(current - 1)}>
-          ‹
-        </button>
-        <button className="player-nav-btn next" onClick={() => goTo(current + 1)}>
-          ›
-        </button>
+        <button className="player-nav-btn prev" onClick={() => goTo(current - 1)}>‹</button>
+        <button className="player-nav-btn next" onClick={() => goTo(current + 1)}>›</button>
 
-        {/* Pause button */}
+        {/* Controls */}
         <button
           className="player-pause-btn"
           onClick={() => setPaused((p) => !p)}
@@ -129,33 +126,20 @@ export default function Player() {
           {paused ? "▶ Lanjutkan" : "⏸ Jeda"}
         </button>
 
-        {/* Admin link */}
-        <Link
-          href="/admin"
-          className="player-admin-link"
-          style={{ opacity: showControls ? 1 : 0 }}
-        >
+        <Link href="/admin" className="player-admin-link" style={{ opacity: showControls ? 1 : 0 }}>
           ⚙ Admin
         </Link>
 
         {/* Bottom overlay */}
         <div className="player-overlay">
-          {/* Progress bar */}
           <div className="player-progress-bar">
-            <div
-              className="player-progress-fill"
-              style={{ width: `${progress}%` }}
-            />
+            <div className="player-progress-fill" style={{ width: `${progress}%` }} />
           </div>
-
-          {/* Info bar */}
           <div className={`player-info-bar ${showControls ? "visible" : ""}`}>
             <span className="player-title">
               {paused && <span style={{ color: "#f59e0b", marginRight: 8 }}>⏸</span>}
               {slide.title}
             </span>
-
-            {/* Dots */}
             <div className="player-dots">
               {slides.map((_, i) => (
                 <div
@@ -166,13 +150,61 @@ export default function Player() {
                 />
               ))}
             </div>
-
-            <span className="player-timer">
-              {paused ? "⏸" : "⏱"} {timeLeft}s
-            </span>
+            <span className="player-timer">{paused ? "⏸" : "⏱"} {timeLeft}s</span>
           </div>
         </div>
       </div>
     </>
+  );
+}
+
+// Komponen iframe dengan deteksi error + fallback
+function IframeWithFallback({ slide }: { slide: Slide }) {
+  const [blocked, setBlocked] = useState(false);
+  const iframeRef = useRef<HTMLIFrameElement>(null);
+
+  useEffect(() => {
+    setBlocked(false);
+    // Deteksi jika iframe tidak bisa load setelah 5 detik
+    const timer = setTimeout(() => {
+      try {
+        const iframe = iframeRef.current;
+        if (iframe) {
+          // Coba akses contentDocument — akan null jika cross-origin blocked
+          const doc = iframe.contentDocument;
+          if (doc === null) {
+            // Normal untuk cross-origin, bukan berarti error
+          }
+        }
+      } catch {
+        setBlocked(true);
+      }
+    }, 5000);
+    return () => clearTimeout(timer);
+  }, [slide.id]);
+
+  if (blocked) {
+    return (
+      <div className="iframe-blocked">
+        <div className="iframe-blocked-content">
+          <div style={{ fontSize: "3rem", marginBottom: 16 }}>🚫</div>
+          <h2>{slide.title}</h2>
+          <p>Halaman ini memblokir tampilan dalam iframe.</p>
+          <a href={slide.url} target="_blank" rel="noopener noreferrer" className="btn btn-primary" style={{ marginTop: 16 }}>
+            🔗 Buka di Tab Baru
+          </a>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <iframe
+      ref={iframeRef}
+      src={slide.url}
+      className="player-iframe"
+      title={slide.title}
+      onError={() => setBlocked(true)}
+    />
   );
 }

@@ -1,77 +1,80 @@
 # 📺 TV Slideshow Manager
 
-Aplikasi manajemen slideshow untuk menampilkan dashboard/link di Smart TV, dengan panel admin untuk mengatur konten.
+Aplikasi slideshow untuk Smart TV dengan Firebase Firestore sebagai database.
 
-## ✨ Fitur
+## 🚀 Setup Firebase (WAJIB sebelum deploy)
 
-- **Slideshow Player** — Tampilkan link/dashboard di TV via iframe, otomatis berganti sesuai durasi
-- **Progress bar** — Indikator visual waktu tersisa setiap slide
-- **Admin Dashboard** — Tambah, edit, hapus, aktif/nonaktif slide
-- **Drag & Drop** — Atur urutan tampil dengan drag
-- **Timer per slide** — Atur durasi masing-masing slide (detik)
-- **Pause/Resume** — Kontrol slideshow saat hover
-- **Auto-refresh** — Perubahan admin otomatis diterapkan dalam 60 detik
+### Langkah 1 — Buat Firebase Project
+1. Buka [console.firebase.google.com](https://console.firebase.google.com)
+2. Klik **Add project** → beri nama → Create
+3. Di sidebar kiri → **Firestore Database** → **Create database**
+4. Pilih mode **Production** → pilih region (contoh: `asia-southeast1`) → Enable
+
+### Langkah 2 — Atur Firestore Rules
+Di Firestore → **Rules**, ganti dengan:
+```
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /{document=**} {
+      allow read, write: if false; // Semua akses hanya via Admin SDK
+    }
+  }
+}
+```
+
+### Langkah 3 — Buat Service Account (untuk server)
+1. Firebase Console → ⚙️ Project Settings → **Service accounts**
+2. Klik **Generate new private key** → Download JSON
+3. Ambil nilai: `project_id`, `client_email`, `private_key`
+
+### Langkah 4 — Environment Variables di Vercel
+Di Vercel Dashboard → Project → **Settings** → **Environment Variables**, tambahkan:
+
+| Key | Value |
+|---|---|
+| `FIREBASE_PROJECT_ID` | project_id dari JSON |
+| `FIREBASE_CLIENT_EMAIL` | client_email dari JSON |
+| `FIREBASE_PRIVATE_KEY` | private_key dari JSON (copy persis dengan \n) |
 
 ## 🚀 Deploy ke Vercel
 
-### Cara 1: Via Vercel CLI
+### Via GitHub:
+1. Push folder ini ke GitHub
+2. Import di [vercel.com](https://vercel.com)
+3. Tambahkan environment variables di atas
+4. Deploy ✅
+
+### Via CLI:
 ```bash
 npm install -g vercel
-cd slideshow-tv
-npm install
 vercel
+# Ikuti panduan, lalu set env variables di dashboard
 ```
 
-### Cara 2: Via GitHub
-1. Push folder ini ke GitHub
-2. Login ke [vercel.com](https://vercel.com)
-3. Import repository
-4. Deploy otomatis ✅
-
 ## 💻 Jalankan Lokal
-
 ```bash
+# Copy dan isi env variables
+cp .env.local.example .env.local
+# Edit .env.local dengan nilai dari Firebase
+
 npm install
 npm run dev
-# Buka http://localhost:3000
 ```
 
 ## 🔐 Akses Admin
-
 - URL: `/admin`
-- Password default: `admin123`
-- **Wajib ganti password** setelah pertama login!
+- Password default: `admin123` ← **Ganti segera setelah login pertama!**
 
 ## 📺 Cara Pakai di Smart TV
-
 1. Buka browser di Smart TV
-2. Navigasi ke URL aplikasi (misal: `https://your-app.vercel.app`)
-3. Tekan F11 atau aktifkan fullscreen
-4. Slideshow berjalan otomatis!
+2. Buka URL: `https://your-app.vercel.app`
+3. Aktifkan fullscreen (F11)
+4. Slideshow berjalan otomatis! 🎉
 
-## ⚠️ Catatan Penting
-
-- **Vercel Serverless**: Data slide disimpan di filesystem. Di Vercel (serverless), data akan reset saat cold start. Untuk produksi, disarankan upgrade ke database (Vercel KV / Supabase).
-- **iframe restrictions**: Beberapa website memblokir tampilan via iframe (X-Frame-Options). Google Apps Script umumnya bisa ditampilkan.
-- Password disimpan di file JSON — untuk keamanan tinggi, gunakan variabel environment.
-
-## 🗂️ Struktur Proyek
-
-```
-slideshow-tv/
-├── pages/
-│   ├── index.tsx          # Slideshow Player (TV)
-│   ├── admin/
-│   │   ├── index.tsx      # Login admin
-│   │   └── dashboard.tsx  # Dashboard admin
-│   └── api/
-│       ├── slides.ts      # Public API (get slides)
-│       └── admin.ts       # Admin API (CRUD)
-├── lib/
-│   ├── types.ts           # TypeScript types
-│   └── storage.ts         # File storage
-├── styles/
-│   └── globals.css
-└── data/
-    └── slides.json        # Data tersimpan di sini
-```
+## ⚠️ Catatan iframe
+Beberapa website memblokir tampilan via iframe (Google Search, YouTube, dll).
+Gunakan URL yang mendukung embed, seperti:
+- Google Apps Script Web App (`/exec` bukan `/edit`)  
+- Looker Studio dengan embed diaktifkan
+- Web app buatan sendiri
