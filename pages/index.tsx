@@ -22,7 +22,6 @@ export default function Player() {
         const newSlides: Slide[] = data.slides;
         slidesRef.current = newSlides;
         setSlides(newSlides);
-        // Only reset to 0 if slide list changed significantly
         setCurrent((prev) => (prev >= newSlides.length ? 0 : prev));
         setTimeLeft((prev) => (prev === 0 ? newSlides[0]?.duration ?? 30 : prev));
       } else {
@@ -38,7 +37,6 @@ export default function Player() {
 
   useEffect(() => {
     fetchSlides();
-    // Poll every 15 seconds to pick up changes from admin
     const refreshTimer = setInterval(fetchSlides, 15000);
     return () => clearInterval(refreshTimer);
   }, [fetchSlides]);
@@ -110,6 +108,11 @@ export default function Player() {
       </Head>
       <div className="player-container" onMouseMove={handleMouseMove}>
 
+        {/* Progress bar di pojok atas */}
+        <div className="player-progress-bar player-progress-top">
+          <div className="player-progress-fill" style={{ width: `${progress}%` }} />
+        </div>
+
         {/* Iframe dengan fallback */}
         <IframeWithFallback key={slide.id + current} slide={slide} />
 
@@ -132,14 +135,7 @@ export default function Player() {
 
         {/* Bottom overlay */}
         <div className="player-overlay">
-          <div className="player-progress-bar">
-            <div className="player-progress-fill" style={{ width: `${progress}%` }} />
-          </div>
           <div className={`player-info-bar ${showControls ? "visible" : ""}`}>
-            <span className="player-title">
-              {paused && <span style={{ color: "#f59e0b", marginRight: 8 }}>⏸</span>}
-              {slide.title}
-            </span>
             <div className="player-dots">
               {slides.map((_, i) => (
                 <div
@@ -158,22 +154,19 @@ export default function Player() {
   );
 }
 
-// Komponen iframe dengan deteksi error + fallback
 function IframeWithFallback({ slide }: { slide: Slide }) {
   const [blocked, setBlocked] = useState(false);
   const iframeRef = useRef<HTMLIFrameElement>(null);
 
   useEffect(() => {
     setBlocked(false);
-    // Deteksi jika iframe tidak bisa load setelah 5 detik
     const timer = setTimeout(() => {
       try {
         const iframe = iframeRef.current;
         if (iframe) {
-          // Coba akses contentDocument — akan null jika cross-origin blocked
           const doc = iframe.contentDocument;
           if (doc === null) {
-            // Normal untuk cross-origin, bukan berarti error
+            // Normal untuk cross-origin
           }
         }
       } catch {
